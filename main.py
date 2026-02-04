@@ -1,16 +1,19 @@
 import numpy as np
-from pyscript import display, document
+from pyscript import document
 
 def solve_system(event):
     try:
-        # Use document.querySelector to get values from the UI
-        rows = int(document.querySelector("#rows").value)
-        cols = int(document.querySelector("#cols").value)
+        # Use document.querySelector instead of Element to find your inputs
+        rows_val = document.querySelector("#rows").value
+        cols_val = document.querySelector("#cols").value
+        
+        rows = int(rows_val)
+        cols = int(cols_val)
         
         A_list = []
         b_list = []
         
-        # Collect data from the grid
+        # Collect data from the UI grid
         for i in range(rows):
             row_data = [float(document.querySelector(f"#a-{i}-{j}").value or 0) for j in range(cols)]
             A_list.append(row_data)
@@ -21,24 +24,27 @@ def solve_system(event):
         
         # Solving Logic
         if rows == cols:
+            # Square Matrix: Use standard linear solver
             x = np.linalg.solve(A, b)
             info = "Solved: Square Matrix (Standard Solver)"
         else:
+            # Non-Square Matrix: Use Pseudoinverse (Least Squares)
             x = np.linalg.pinv(A) @ b
             info = f"Solved: Non-Square ({rows}x{cols}) via Pseudoinverse"
 
-        display_results(x, info)
+        # Show Results by updating the HTML directly
+        grid = document.querySelector("#solutionGrid")
+        grid.innerHTML = ""
+        for i, val in enumerate(x):
+            grid.innerHTML += f"""
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                    <div class="text-[10px] text-blue-500 font-bold uppercase">X{i+1}</div>
+                    <div class="text-xl font-mono">{float(val):.4f}</div>
+                </div>"""
+        
+        document.querySelector("#resultArea").classList.remove("hidden")
+        document.querySelector("#extraInfo").innerText = info
+        
     except Exception as e:
+        # Update error text on the screen
         document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
-
-def display_results(x, info):
-    grid = document.querySelector("#solutionGrid")
-    grid.innerHTML = ""
-    for i, val in enumerate(x):
-        grid.innerHTML += f"""
-            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
-                <div class="text-[10px] text-blue-500 font-bold uppercase">X{i+1}</div>
-                <div class="text-xl font-mono">{float(val):.4f}</div>
-            </div>"""
-    document.querySelector("#resultArea").classList.remove("hidden")
-    document.querySelector("#extraInfo").innerText = info
