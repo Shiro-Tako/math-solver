@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS114 Linear Solver</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans p-8">
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <h1 class="text-3xl font-bold mb-2">🔢 Linear Equation Solver</h1>
+        <p class="text-slate-500 mb-8 text-sm uppercase tracking-wider font-semibold">CSS114 Project #1: Gauss & Gauss-Jordan</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div>
+                <label class="block text-sm font-medium mb-2">Matrix Size (n)</label>
+                <input type="number" id="matrixSize" value="3" min="2" max="6" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-2">Algorithm</label>
+                <select id="method" class="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    <option value="gauss">Gauss Elimination with Pivoting</option>
+                    <option value="jordan">Gauss-Jordan Elimination</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="matrixContainer" class="mb-8 overflow-x-auto">
+            </div>
+
+        <button onclick="solve()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg active:scale-95">
+            Calculate Solution
+        </button>
+
+        <div id="resultArea" class="mt-8 hidden">
+            <h3 class="text-lg font-bold mb-4">Solution Vector (x):</h3>
+            <div id="solutionDisplay" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('matrixContainer');
+        const sizeInput = document.getElementById('matrixSize');
+
+        function generateMatrix() {
+            const n = parseInt(sizeInput.value);
+            let html = `<div class="grid gap-2" style="grid-template-columns: repeat(${n + 1}, minmax(80px, 1fr))">`;
+            for (let i = 0; i < n; i++) {
+                for (let j = 0; j < n; j++) {
+                    html += `<input type="number" step="any" id="a-${i}-${j}" placeholder="A[${i+1}][${j+1}]" class="p-2 border rounded text-center focus:bg-blue-50">`;
+                }
+                html += `<input type="number" step="any" id="b-${i}" placeholder="b[${i+1}]" class="p-2 border rounded text-center bg-slate-100 font-bold">`;
+            }
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        sizeInput.addEventListener('change', generateMatrix);
+        window.onload = generateMatrix;
+
+        function solve() {
+            const n = parseInt(sizeInput.value);
+            const method = document.getElementById('method').value;
+            let matrix = [];
+            
+            for (let i = 0; i < n; i++) {
+                matrix[i] = [];
+                for (let j = 0; j < n; j++) {
+                    matrix[i][j] = parseFloat(document.getElementById(`a-${i}-${j}`).value) || 0;
+                }
+                matrix[i][n] = parseFloat(document.getElementById(`b-${i}`).value) || 0;
+            }
+
+            let result = (method === 'gauss') ? gaussElimination(matrix, n) : gaussJordan(matrix, n);
+            displayResult(result);
+        }
+
+        function gaussElimination(A, n) {
+            for (let i = 0; i < n; i++) {
+                let max = i;
+                for (let k = i + 1; k < n; k++) if (Math.abs(A[k][i]) > Math.abs(A[max][i])) max = k;
+                [A[i], A[max]] = [A[max], A[i]];
+
+                for (let k = i + 1; k < n; k++) {
+                    let c = -A[k][i] / A[i][i];
+                    for (let j = i; j <= n; j++) {
+                        if (i === j) A[k][j] = 0;
+                        else A[k][j] += c * A[i][j];
+                    }
+                }
+            }
+            let x = new Array(n).fill(0);
+            for (let i = n - 1; i >= 0; i--) {
+                x[i] = A[i][n] / A[i][i];
+                for (let k = i - 1; k >= 0; k--) A[k][n] -= A[k][i] * x[i];
+            }
+            return x;
+        }
+
+        function gaussJordan(A, n) {
+            for (let i = 0; i < n; i++) {
+                let max = i;
+                for (let k = i + 1; k < n; k++) if (Math.abs(A[k][i]) > Math.abs(A[max][i])) max = k;
+                [A[i], A[max]] = [A[max], A[i]];
+
+                let p = A[i][i];
+                for (let j = i; j <= n; j++) A[i][j] /= p;
+                for (let k = 0; k < n; k++) {
+                    if (k !== i) {
+                        let c = A[k][i];
+                        for (let j = i; j <= n; j++) A[k][j] -= c * A[i][j];
+                    }
+                }
+            }
+            return A.map(row => row[n]);
+        }
+
+        function displayResult(x) {
+            const resDiv = document.getElementById('resultArea');
+            const display = document.getElementById('solutionDisplay');
+            resDiv.classList.remove('hidden');
+            display.innerHTML = x.map((val, i) => `
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-center">
+                    <div class="text-xs text-blue-500 font-bold">X${i+1}</div>
+                    <div class="text-xl font-mono">${isNaN(val) ? 'Error' : val.toFixed(4)}</div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>
