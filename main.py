@@ -1,5 +1,70 @@
+from fractions import Fraction
+
 import numpy as np
 from pyscript import document
+
+
+def parse_fraction(value):
+    text = (value or "").strip()
+    if not text:
+        return Fraction(0)
+    return Fraction(text)
+
+
+def is_integer_fraction(value):
+    return isinstance(value, Fraction) and value.denominator == 1
+
+
+def gauss_elimination(A, b):
+    n = len(A)
+    A = [row[:] for row in A]
+    b = b[:]
+
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
+        if A[pivot][i] == 0:
+            raise ValueError("Matrix is singular.")
+        if pivot != i:
+            A[i], A[pivot] = A[pivot], A[i]
+            b[i], b[pivot] = b[pivot], b[i]
+
+        for r in range(i + 1, n):
+            factor = A[r][i] / A[i][i]
+            A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
+            b[r] = b[r] - factor * b[i]
+
+    x = [0 for _ in range(n)]
+    for i in range(n - 1, -1, -1):
+        total = sum(A[i][j] * x[j] for j in range(i + 1, n))
+        x[i] = (b[i] - total) / A[i][i]
+    return x
+
+
+def gauss_jordan(A, b):
+    n = len(A)
+    A = [row[:] for row in A]
+    b = b[:]
+
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
+        if A[pivot][i] == 0:
+            raise ValueError("Matrix is singular.")
+        if pivot != i:
+            A[i], A[pivot] = A[pivot], A[i]
+            b[i], b[pivot] = b[pivot], b[i]
+
+        pivot_value = A[i][i]
+        A[i] = [value / pivot_value for value in A[i]]
+        b[i] = b[i] / pivot_value
+
+        for r in range(n):
+            if r == i:
+                continue
+            factor = A[r][i]
+            A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
+            b[r] = b[r] - factor * b[i]
+
+    return b
 
 def solve_system(event):
     try:
@@ -10,12 +75,22 @@ def solve_system(event):
         
         A_list = []
         b_list = []
+        A_exact = []
+        b_exact = []
         
         # Build A and b from the UI grid
         for i in range(rows):
-            row_data = [float(document.querySelector(f"#a-{i}-{j}").value or 0) for j in range(cols)]
+            row_data = []
+            row_exact = []
+            for j in range(cols):
+                value = document.querySelector(f"#a-{i}-{j}").value
+                row_exact.append(parse_fraction(value))
+                row_data.append(float(value or 0))
             A_list.append(row_data)
-            b_list.append(float(document.querySelector(f"#b-{i}").value or 0))
+            A_exact.append(row_exact)
+            b_value = document.querySelector(f"#b-{i}").value
+            b_exact.append(parse_fraction(b_value))
+            b_list.append(float(b_value or 0))
         
         A = np.array(A_list)
         b = np.array(b_list)
@@ -23,13 +98,24 @@ def solve_system(event):
         # Solving Logic
         if rows == cols:
             if method == "gauss":
-                # Standard solver represents Gauss with partial pivoting
-                x = np.linalg.solve(A, b)
+                x_exact = gauss_elimination(A_exact, b_exact)
                 info = "Calculation: Gauss Elimination with Partial Pivoting."
             else:
-                # Jordan method via matrix inversion (A⁻¹b)
-                x = np.linalg.inv(A) @ b
-                info = "Calculation: Gauss-Jordan Elimination (via Matrix Inversion)."
+                x_exact = gauss_jordan(A_exact, b_exact)
+                info = "Calculation: Gauss-Jordan Elimination."
+
+            x = [float(value) for value in x_exact]
+            if all(is_integer_fraction(value) for value in x_exact):
+                exact_text = ", ".join(
+                    f"x{i+1} = {value.numerator}"
+                    for i, value in enumerate(x_exact)
+                )
+            else:
+                exact_text = ", ".join(
+                    f"x{i+1} = {value.numerator}/{value.denominator}"
+                    for i, value in enumerate(x_exact)
+                )
+            info = f"{info} Exact solution: {exact_text}."
         else:
             # Non-square support via Pseudoinverse
             x = np.linalg.pinv(A) @ b
