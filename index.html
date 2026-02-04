@@ -2,30 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Linear Solver (Python)</title>
+    <title>CSS114 Python Solver</title>
     <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
     <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 p-10">
-    <div class="max-w-4xl mx-auto bg-white p-8 rounded-3xl shadow-lg">
-        <h1 class="text-2xl font-bold text-blue-600 mb-6">CSS114 Linear Solver</h1>
+    <div class="max-w-4xl mx-auto bg-white p-8 rounded-3xl shadow-lg border border-gray-200">
+        <h1 class="text-2xl font-bold text-blue-600 mb-6">🔢 CSS114 Linear Solver</h1>
         
         <div class="flex gap-4 mb-6">
             <input type="number" id="rows" value="3" class="border p-2 rounded w-20" title="Rows">
             <input type="number" id="cols" value="3" class="border p-2 rounded w-20" title="Cols">
-            <select id="method" class="border p-2 rounded flex-grow">
-                <option value="gauss">Gauss/Standard</option>
-            </select>
         </div>
 
         <div id="matrixContainer" class="mb-6 p-4 bg-gray-50 rounded-xl border border-dashed border-gray-300"></div>
 
-        <button py-click="solve_system" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700">
+        <button py-click="solve_system" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition-all active:scale-95">
             Calculate with Python
         </button>
 
-        <div id="resultArea" class="mt-8 hidden">
+        <div id="resultArea" class="mt-10 hidden">
             <div id="solutionGrid" class="grid grid-cols-2 md:grid-cols-4 gap-4"></div>
             <div id="extraInfo" class="mt-4 p-2 text-xs italic text-gray-400"></div>
         </div>
