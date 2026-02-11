@@ -217,6 +217,47 @@ def lu_solve(A, b):
     return x, steps
 
 
+def lu_inverse_with_steps(A):
+    n = len(A)
+    P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
+    inverse_columns = []
+    steps = decomposition_steps + [
+        f"Step {len(decomposition_steps)}: Solve A·X = I using the LU factors for each identity column."
+    ]
+
+    for col in range(n):
+        e_col = [Fraction(1) if row == col else Fraction(0) for row in range(n)]
+        b_permuted = apply_permutation(P, e_col)
+
+        steps.append(
+            f"Step {len(steps)}: Column {col + 1} -> apply permutation to e{col + 1}, "
+            + f"Pb = [{', '.join(format_fraction(value) for value in b_permuted)}]."
+        )
+
+        y, forward_steps = forward_substitution_with_steps(L, b_permuted)
+        x_col, backward_steps = backward_substitution_with_steps(U, y)
+        inverse_columns.append(x_col)
+
+        steps.extend(
+            f"Step {len(steps)}: Column {col + 1} forward solve - {text}"
+            for text in forward_steps
+        )
+        steps.extend(
+            f"Step {len(steps)}: Column {col + 1} backward solve - {text}"
+            for text in backward_steps
+        )
+
+    inverse_matrix = [
+        [inverse_columns[col][row] for col in range(n)]
+        for row in range(n)
+    ]
+    steps.append(
+        f"Step {len(steps)}: Assemble inverse matrix from solved columns.\n"
+        + format_matrix(inverse_matrix)
+    )
+    return inverse_matrix, steps
+
+
 def solve_system(event):
     try:
         rows = int(document.querySelector("#rows").value)
@@ -244,7 +285,23 @@ def solve_system(event):
         A = np.array(A_list)
         b = np.array(b_list)
 
-        if rows == cols:
+        result_items = []
+
+        if method == "inverse":
+            if rows != cols:
+                raise ValueError("Inverse Matrix requires a square matrix.")
+
+            inverse_matrix, steps = lu_inverse_with_steps(A_exact)
+            info = "Calculation: Inverse Matrix using LU Decomposition with Partial Pivoting."
+            inverse_text = format_matrix(inverse_matrix).replace("\n", " ")
+            info = f"{info} Inverse matrix A⁻¹: {inverse_text}."
+            process_text = "\n\n".join(steps)
+
+            for i in range(rows):
+                for j in range(cols):
+                    value = float(inverse_matrix[i][j])
+                    result_items.append((f"A⁻¹({i + 1},{j + 1})", value))
+        elif rows == cols:
             if method == "gauss":
                 x_exact, steps = gauss_elimination(A_exact, b_exact)
                 info = "Calculation: Gauss Elimination with Partial Pivoting."
@@ -267,6 +324,7 @@ def solve_system(event):
                 )
             info = f"{info} Exact solution: {exact_text}."
             process_text = "\n\n".join(steps)
+            result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
         else:
             x = np.linalg.pinv(A) @ b
             info = f"Non-Square Matrix detected ({rows}x{cols}). Applied Pseudoinverse."
@@ -274,14 +332,15 @@ def solve_system(event):
                 "Initial matrix is non-square, so row-reduction steps are not used.\n"
                 "The solver applied the pseudoinverse method to estimate a least-squares solution."
             )
+            result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
 
         grid = document.querySelector("#solutionGrid")
         grid.innerHTML = ""
-        for i, val in enumerate(x):
+        for label, val in result_items:
             grid.innerHTML += f"""
-                <div class=\"bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center\">
-                    <div class=\"text-blue-500 font-bold text-[10px] uppercase mb-1\">Variable X{i+1}</div>
-                    <div class=\"text-2xl font-mono font-bold\">{float(val):.4f}</div>
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center">
+                    <div class="text-blue-500 font-bold text-[10px] uppercase mb-1">{label}</div>
+                    <div class="text-2xl font-mono font-bold">{float(val):.4f}</div>
                 </div>"""
 
         document.querySelector("#resultArea").classList.remove("hidden")
