@@ -1,210 +1,293 @@
-import copy
+from fractions import Fraction
 
-def print_matrix(matrix, name="Matrix"):
-    """ฟังก์ชันสำหรับแสดงผลเมทริกซ์ให้สวยงาม"""
-    print(f"{name}:")
-    for row in matrix:
-        print("  " + "  ".join(f"{val:8.3f}" for val in row))
-    print()
+import numpy as np
+from pyscript import document
 
-def identity_matrix(n):
-    """สร้างเมทริกซ์เอกลักษณ์ขนาด n x n"""
-    return [[1.0 if i == j else 0.0 for j in range(n)] for i in range(n)]
 
-def multiply_matrix_vector(matrix, vector):
-    """คูณเมทริกซ์กับเวกเตอร์"""
-    result = []
-    for i in range(len(matrix)):
-        total = 0
-        for j in range(len(vector)):
-            total += matrix[i][j] * vector[j]
-        result.append(total)
-    return result
+def parse_fraction(value):
+    text = (value or "").strip()
+    if not text:
+        return Fraction(0)
+    return Fraction(text)
 
-# ---------------------------------------------------------
-# ส่วนที่ 1: LU Factorization (สำหรับแก้ระบบสมการ)
-# ---------------------------------------------------------
 
-def lu_decomposition(A):
-    """
-    แยกตัวประกอบ PA = LU โดยใช้ Partial Pivoting
-    คืนค่า: P (Permutation), L (Lower), U (Upper)
-    """
+def is_integer_fraction(value):
+    return isinstance(value, Fraction) and value.denominator == 1
+
+
+def format_fraction(value):
+    if is_integer_fraction(value):
+        return str(value.numerator)
+    return f"{value.numerator}/{value.denominator}"
+
+
+def format_system_state(A, b):
+    lines = []
+    for row, constant in zip(A, b):
+        coeffs = ", ".join(format_fraction(value) for value in row)
+        lines.append(f"[{coeffs}] | {format_fraction(constant)}")
+    return "\n".join(lines)
+
+
+def format_matrix(matrix):
+    return "\n".join(
+        "[" + ", ".join(format_fraction(value) for value in row) + "]"
+        for row in matrix
+    )
+
+
+def format_permutation(P):
+    return "[" + ", ".join(str(value) for value in P) + "]"
+
+
+def gauss_elimination(A, b):
     n = len(A)
-    U = copy.deepcopy(A)       # copy A มาใส่ U (ใช้ทำ U ให้เป็นสามเหลี่ยมบน)
-    L = identity_matrix(n)     
-    P = identity_matrix(n)     
+    A = [row[:] for row in A]
+    b = b[:]
+    steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
+
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
+        if A[pivot][i] == 0:
+            raise ValueError("Matrix is singular.")
+        if pivot != i:
+            A[i], A[pivot] = A[pivot], A[i]
+            b[i], b[pivot] = b[pivot], b[i]
+            steps.append(
+                f"Step {len(steps)}: Swap row {i + 1} with row {pivot + 1}.\n"
+                + format_system_state(A, b)
+            )
+
+        for r in range(i + 1, n):
+            factor = A[r][i] / A[i][i]
+            A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
+            b[r] = b[r] - factor * b[i]
+            steps.append(
+                f"Step {len(steps)}: R{r + 1} = R{r + 1} - ({format_fraction(factor)})·R{i + 1}.\n"
+                + format_system_state(A, b)
+            )
+
+    x = [Fraction(0) for _ in range(n)]
+    for i in range(n - 1, -1, -1):
+        total = sum(A[i][j] * x[j] for j in range(i + 1, n))
+        x[i] = (b[i] - total) / A[i][i]
+        steps.append(
+            f"Step {len(steps)}: Back substitution for x{i + 1} = {format_fraction(x[i])}."
+        )
+    return x, steps
+
+
+def gauss_jordan(A, b):
+    n = len(A)
+    A = [row[:] for row in A]
+    b = b[:]
+    steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
+
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
+        if A[pivot][i] == 0:
+            raise ValueError("Matrix is singular.")
+        if pivot != i:
+            A[i], A[pivot] = A[pivot], A[i]
+            b[i], b[pivot] = b[pivot], b[i]
+            steps.append(
+                f"Step {len(steps)}: Swap row {i + 1} with row {pivot + 1}.\n"
+                + format_system_state(A, b)
+            )
+
+        pivot_value = A[i][i]
+        A[i] = [value / pivot_value for value in A[i]]
+        b[i] = b[i] / pivot_value
+        steps.append(
+            f"Step {len(steps)}: Normalize row {i + 1} by dividing by {format_fraction(pivot_value)}.\n"
+            + format_system_state(A, b)
+        )
+
+        for r in range(n):
+            if r == i:
+                continue
+            factor = A[r][i]
+            A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
+            b[r] = b[r] - factor * b[i]
+            steps.append(
+                f"Step {len(steps)}: R{r + 1} = R{r + 1} - ({format_fraction(factor)})·R{i + 1}.\n"
+                + format_system_state(A, b)
+            )
+
+    return b, steps
+
+
+def lu_decomposition_with_steps(A):
+    n = len(A)
+    U = [row[:] for row in A]
+    L = [[Fraction(0) for _ in range(n)] for _ in range(n)]
+    P = list(range(n))
+    steps = [
+        "Initial matrices:\n"
+        + "A:\n"
+        + format_matrix(A)
+        + "\n\nL:\n"
+        + format_matrix(L)
+        + "\n\nU:\n"
+        + format_matrix(U)
+        + "\n\nPermutation order: "
+        + format_permutation(P)
+    ]
 
     for k in range(n):
-        # --- Partial Pivoting ---
-        # หาแถวที่มีค่าสัมบูรณ์สูงสุดในคอลัมน์ k เพื่อลด error 
-        pivot_row = k
-        max_val = abs(U[k][k])
-        for i in range(k + 1, n):
-            if abs(U[i][k]) > max_val:
-                max_val = abs(U[i][k])
-                pivot_row = i
-        
-        # สลับแถวใน U, P และ L (เฉพาะส่วนที่คำนวณแล้ว)
-        U[k], U[pivot_row] = U[pivot_row], U[k]
-        P[k], P[pivot_row] = P[pivot_row], P[k]
-        if k > 0:
-            for col in range(k):
-                L[k][col], L[pivot_row][col] = L[pivot_row][col], L[k][col]
+        pivot_row = max(range(k, n), key=lambda r: abs(U[r][k]))
+        if U[pivot_row][k] == 0:
+            raise ValueError("Matrix is singular.")
 
-        # ตรวจสอบว่าเป็น Singular Matrix หรือไม่
-        if abs(U[k][k]) < 1e-10:
-            raise ValueError("Matrix is Singular (cannot solve).")
+        if pivot_row != k:
+            U[k], U[pivot_row] = U[pivot_row], U[k]
+            P[k], P[pivot_row] = P[pivot_row], P[k]
+            for j in range(k):
+                L[k][j], L[pivot_row][j] = L[pivot_row][j], L[k][j]
+            steps.append(
+                f"Step {len(steps)}: Pivot swap row {k + 1} with row {pivot_row + 1}.\n"
+                + "L:\n"
+                + format_matrix(L)
+                + "\n\nU:\n"
+                + format_matrix(U)
+                + "\n\nPermutation order: "
+                + format_permutation(P)
+            )
 
-        # --- Elimination Process ---
-        # ทำการกำจัดตัวแปรเพื่อสร้าง Upper Triangular Matrix (U)
+        L[k][k] = Fraction(1)
+        steps.append(
+            f"Step {len(steps)}: Set L{k + 1}{k + 1} = 1.\n"
+            + "L:\n"
+            + format_matrix(L)
+        )
+
         for i in range(k + 1, n):
             factor = U[i][k] / U[k][k]
-            L[i][k] = factor # เก็บตัวคูณไว้ใน L
+            L[i][k] = factor
             for j in range(k, n):
                 U[i][j] -= factor * U[k][j]
-                
-    return P, L, U
+            steps.append(
+                f"Step {len(steps)}: Eliminate U{i + 1}{k + 1} using factor {format_fraction(factor)}.\n"
+                + "L:\n"
+                + format_matrix(L)
+                + "\n\nU:\n"
+                + format_matrix(U)
+            )
 
-def forward_substitution(L, b):
-    """แก้สมการ Ly = b (หาค่า y)"""
+    return P, L, U, steps
+
+
+def apply_permutation(P, b):
+    return [b[index] for index in P]
+
+
+def forward_substitution_with_steps(L, b):
     n = len(L)
-    y = [0 for _ in range(n)]
+    y = [Fraction(0) for _ in range(n)]
+    steps = ["Solve Ly = Pb using forward substitution."]
     for i in range(n):
-        sum_val = sum(L[i][j] * y[j] for j in range(i))
-        y[i] = (b[i] - sum_val) / L[i][i]
-    return y
+        total = sum(L[i][j] * y[j] for j in range(i))
+        y[i] = (b[i] - total) / L[i][i]
+        steps.append(f"Step {len(steps)}: y{i + 1} = {format_fraction(y[i])}.")
+    return y, steps
 
-def backward_substitution(U, y):
-    """แก้สมการ Ux = y (หาค่า x)"""
+
+def backward_substitution_with_steps(U, y):
     n = len(U)
-    x = [0 for _ in range(n)]
+    x = [Fraction(0) for _ in range(n)]
+    steps = ["Solve Ux = y using backward substitution."]
     for i in range(n - 1, -1, -1):
-        sum_val = sum(U[i][j] * x[j] for j in range(i + 1, n))
-        x[i] = (y[i] - sum_val) / U[i][i]
-    return x
+        total = sum(U[i][j] * x[j] for j in range(i + 1, n))
+        x[i] = (y[i] - total) / U[i][i]
+        steps.append(f"Step {len(steps)}: x{i + 1} = {format_fraction(x[i])}.")
+    return x, steps
 
-def solve_linear_system_lu(A, b):
-    """ฟังก์ชันหลักสำหรับแก้ระบบสมการด้วย LU"""
+
+def lu_solve(A, b):
+    P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
+    b_permuted = apply_permutation(P, b)
+    permutation_step = (
+        f"Step {len(decomposition_steps)}: Apply permutation to b => Pb = "
+        f"[{', '.join(format_fraction(value) for value in b_permuted)}]."
+    )
+    y, forward_steps = forward_substitution_with_steps(L, b_permuted)
+    x, backward_steps = backward_substitution_with_steps(U, y)
+
+    steps = decomposition_steps + [permutation_step] + forward_steps + backward_steps
+    return x, steps
+
+
+def solve_system(event):
     try:
-        # 1. แยกตัวประกอบ A เป็น P, L, U
-        P, L, U = lu_decomposition(A)
-        
-        # 2. จัดเรียง b ใหม่ตาม P (Pb)
-        b_new = multiply_matrix_vector(P, b)
-        
-        # 3. หา y จาก Ly = Pb
-        y = forward_substitution(L, b_new)
-        
-        # 4. หา x จาก Ux = y
-        x = backward_substitution(U, y)
-        return x
-    except ValueError as e:
-        return str(e)
+        rows = int(document.querySelector("#rows").value)
+        cols = int(document.querySelector("#cols").value)
+        method = document.querySelector("#method").value
 
-# ---------------------------------------------------------
-# ส่วนที่ 2: Inverse Matrix (โดยใช้ Gauss-Jordan)
-# ---------------------------------------------------------
+        A_list = []
+        b_list = []
+        A_exact = []
+        b_exact = []
 
-def inverse_matrix(A):
-    """
-    หา Inverse ของเมทริกซ์โดยใช้วิธี Augmented Matrix [A|I] -> [I|A^-1]
-    """
-    n = len(A)
-    # สร้าง Augmented Matrix [A | Identity]
-    M = [A[i] + [1 if i == j else 0 for j in range(n)] for i in range(n)]
+        for i in range(rows):
+            row_data = []
+            row_exact = []
+            for j in range(cols):
+                value = document.querySelector(f"#a-{i}-{j}").value
+                row_exact.append(parse_fraction(value))
+                row_data.append(float(value or 0))
+            A_list.append(row_data)
+            A_exact.append(row_exact)
+            b_value = document.querySelector(f"#b-{i}").value
+            b_exact.append(parse_fraction(b_value))
+            b_list.append(float(b_value or 0))
 
-    # Forward Elimination (ทำให้เป็น Upper Triangle)
-    for k in range(n):
-        # Pivoting
-        pivot_row = k
-        for i in range(k + 1, n):
-            if abs(M[i][k]) > abs(M[pivot_row][k]):
-                pivot_row = i
-        M[k], M[pivot_row] = M[pivot_row], M[k]
+        A = np.array(A_list)
+        b = np.array(b_list)
 
-        pivot = M[k][k]
-        if abs(pivot) < 1e-10:
-            return None # หา Inverse ไม่ได้
+        if rows == cols:
+            if method == "gauss":
+                x_exact, steps = gauss_elimination(A_exact, b_exact)
+                info = "Calculation: Gauss Elimination with Partial Pivoting."
+            elif method == "jordan":
+                x_exact, steps = gauss_jordan(A_exact, b_exact)
+                info = "Calculation: Gauss-Jordan Elimination."
+            else:
+                x_exact, steps = lu_solve(A_exact, b_exact)
+                info = "Calculation: LU Decomposition with Partial Pivoting."
 
-        # หารแถว k ด้วย pivot เพื่อให้สมาชิกนำเป็น 1
-        for j in range(k, 2 * n):
-            M[k][j] /= pivot
+            x = [float(value) for value in x_exact]
+            if all(is_integer_fraction(value) for value in x_exact):
+                exact_text = ", ".join(
+                    f"x{i + 1} = {value.numerator}" for i, value in enumerate(x_exact)
+                )
+            else:
+                exact_text = ", ".join(
+                    f"x{i + 1} = {value.numerator}/{value.denominator}"
+                    for i, value in enumerate(x_exact)
+                )
+            info = f"{info} Exact solution: {exact_text}."
+            process_text = "\n\n".join(steps)
+        else:
+            x = np.linalg.pinv(A) @ b
+            info = f"Non-Square Matrix detected ({rows}x{cols}). Applied Pseudoinverse."
+            process_text = (
+                "Initial matrix is non-square, so row-reduction steps are not used.\n"
+                "The solver applied the pseudoinverse method to estimate a least-squares solution."
+            )
 
-        # กำจัดแถวอื่นๆ
-        for i in range(n):
-            if i != k:
-                factor = M[i][k]
-                for j in range(k, 2 * n):
-                    M[i][j] -= factor * M[k][j]
+        grid = document.querySelector("#solutionGrid")
+        grid.innerHTML = ""
+        for i, val in enumerate(x):
+            grid.innerHTML += f"""
+                <div class=\"bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center\">
+                    <div class=\"text-blue-500 font-bold text-[10px] uppercase mb-1\">Variable X{i+1}</div>
+                    <div class=\"text-2xl font-mono font-bold\">{float(val):.4f}</div>
+                </div>"""
 
-    # แยกส่วน Inverse ออกมา (ครึ่งขวาของ Matrix)
-    inv = [row[n:] for row in M]
-    return inv
+        document.querySelector("#resultArea").classList.remove("hidden")
+        document.querySelector("#extraInfo").innerText = info
+        document.querySelector("#processSteps").innerText = process_text
 
-# ---------------------------------------------------------
-# ส่วน Main Program: Test Cases
-# ---------------------------------------------------------
-if __name__ == "__main__":
-    print("=== Demo Program Project CSS114 ===")
-
-    # --- ตัวอย่างที่ 1: ระบบสมการ 3 ตัวแปร ---
-    print("\n[Test Case 1] Solving 3x3 System using LU Factorization")
-    A1 = [
-        [2, 1, 3],
-        [4, 3, 5],
-        [6, 5, 5]
-    ]
-    b1 = [1, 1, -3]
-    result1 = solve_linear_system_lu(A1, b1)
-    print(f"Solution x: {result1}")
-
-    # --- ตัวอย่างที่ 2: ระบบสมการ 4 ตัวแปร ---
-    print("\n[Test Case 2] Solving 4x4 System using LU Factorization")
-    A2 = [
-        [2, -1, -3, 1],
-        [1, 1, 1, -2],
-        [3, 2, -3, -4],
-        [-1, -4, 1, 1]
-    ]
-    b2 = [9, 10, 6, 6]
-    result2 = solve_linear_system_lu(A2, b2)
-    print(f"Solution x: {result2}")
-
-    # --- ตัวอย่างที่ 3: หา Inverse Matrix ---
-    print("\n[Test Case 3] Finding Inverse Matrix")
-    A3 = [
-        [1, 2, -3],
-        [-1, 1, -1],
-        [0, -2, 3]
-    ]
-    inv3 = inverse_matrix(A3)
-    if inv3:
-        print_matrix(inv3, "Inverse of A3")
-    else:
-        print("Matrix A3 is singular, no inverse.")
-
-    # --- ตัวอย่างที่ 4: หา Inverse และแก้สมการ Ax=b ---
-    print("\n[Test Case 4] Finding Inverse and Solving Ax=b")
-    # หมายเหตุ: Matrix นี้ในโจทย์ แถว 1 และ แถว 3 เหมือนกัน (1, 2, 3) 
-    # ทำให้ Determinant = 0 (Singular Matrix)
-    A4 = [
-        [1, 2, 3],
-        [-1, -1, -1],
-        [1, 2, 3]
-    ]
-    b4 = [5, 3, -1]
-    
-    # พยายามหา Inverse
-    inv4 = inverse_matrix(A4)
-    if inv4:
-        print_matrix(inv4, "Inverse of A4")
-        # ถ้าหา Inverse ได้ ก็จะคูณเพื่อหา x
-        x4 = multiply_matrix_vector(inv4, b4)
-        print(f"Solution x (from A^-1 * b): {x4}")
-    else:
-        print("Result: Matrix A4 is singular (Determinant is 0). Cannot find inverse.")
-        
-    # ลองแก้ด้วย LU
-    result4_lu = solve_linear_system_lu(A4, b4)
-    print(f"LU Method Result: {result4_lu}")
+    except Exception as e:
+        document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
+        document.querySelector("#processSteps").innerText = ""
