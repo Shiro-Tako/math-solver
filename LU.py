@@ -217,6 +217,69 @@ def lu_solve(A, b):
     return x, steps
 
 
+def gauss_jordan_inverse_with_steps(A):
+    n = len(A)
+    left = [row[:] for row in A]
+    right = [
+        [Fraction(1) if i == j else Fraction(0) for j in range(n)]
+        for i in range(n)
+    ]
+    steps = [
+        "Initial augmented matrix [A | I]:\n"
+        + "Left (A):\n"
+        + format_matrix(left)
+        + "\n\nRight (I):\n"
+        + format_matrix(right)
+    ]
+
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(left[r][i]))
+        if left[pivot][i] == 0:
+            raise ValueError("Matrix is singular.")
+
+        if pivot != i:
+            left[i], left[pivot] = left[pivot], left[i]
+            right[i], right[pivot] = right[pivot], right[i]
+            steps.append(
+                f"Step {len(steps)}: Swap row {i + 1} with row {pivot + 1}.\n"
+                + "Left:\n"
+                + format_matrix(left)
+                + "\n\nRight:\n"
+                + format_matrix(right)
+            )
+
+        pivot_value = left[i][i]
+        left[i] = [value / pivot_value for value in left[i]]
+        right[i] = [value / pivot_value for value in right[i]]
+        steps.append(
+            f"Step {len(steps)}: Normalize row {i + 1} by dividing by {format_fraction(pivot_value)}.\n"
+            + "Left:\n"
+            + format_matrix(left)
+            + "\n\nRight:\n"
+            + format_matrix(right)
+        )
+
+        for r in range(n):
+            if r == i:
+                continue
+            factor = left[r][i]
+            left[r] = [a - factor * p for a, p in zip(left[r], left[i])]
+            right[r] = [a - factor * p for a, p in zip(right[r], right[i])]
+            steps.append(
+                f"Step {len(steps)}: R{r + 1} = R{r + 1} - ({format_fraction(factor)})·R{i + 1}.\n"
+                + "Left:\n"
+                + format_matrix(left)
+                + "\n\nRight:\n"
+                + format_matrix(right)
+            )
+
+    steps.append(
+        f"Step {len(steps)}: Left side becomes identity, so right side is A⁻¹.\n"
+        + format_matrix(right)
+    )
+    return right, steps
+
+
 def solve_system(event):
     try:
         rows = int(document.querySelector("#rows").value)
@@ -244,7 +307,23 @@ def solve_system(event):
         A = np.array(A_list)
         b = np.array(b_list)
 
-        if rows == cols:
+        result_items = []
+
+        if method == "inverse":
+            if rows != cols:
+                raise ValueError("Inverse Matrix requires a square matrix.")
+
+            inverse_matrix, steps = gauss_jordan_inverse_with_steps(A_exact)
+            info = "Calculation: Inverse Matrix using Gauss-Jordan Elimination."
+            inverse_text = format_matrix(inverse_matrix).replace("\n", " ")
+            info = f"{info} Inverse matrix A⁻¹: {inverse_text}."
+            process_text = "\n\n".join(steps)
+
+            for i in range(rows):
+                for j in range(cols):
+                    value = float(inverse_matrix[i][j])
+                    result_items.append((f"A⁻¹({i + 1},{j + 1})", value))
+        elif rows == cols:
             if method == "gauss":
                 x_exact, steps = gauss_elimination(A_exact, b_exact)
                 info = "Calculation: Gauss Elimination with Partial Pivoting."
@@ -267,6 +346,7 @@ def solve_system(event):
                 )
             info = f"{info} Exact solution: {exact_text}."
             process_text = "\n\n".join(steps)
+            result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
         else:
             x = np.linalg.pinv(A) @ b
             info = f"Non-Square Matrix detected ({rows}x{cols}). Applied Pseudoinverse."
@@ -274,14 +354,15 @@ def solve_system(event):
                 "Initial matrix is non-square, so row-reduction steps are not used.\n"
                 "The solver applied the pseudoinverse method to estimate a least-squares solution."
             )
+            result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
 
         grid = document.querySelector("#solutionGrid")
         grid.innerHTML = ""
-        for i, val in enumerate(x):
+        for label, val in result_items:
             grid.innerHTML += f"""
-                <div class=\"bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center\">
-                    <div class=\"text-blue-500 font-bold text-[10px] uppercase mb-1\">Variable X{i+1}</div>
-                    <div class=\"text-2xl font-mono font-bold\">{float(val):.4f}</div>
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center">
+                    <div class="text-blue-500 font-bold text-[10px] uppercase mb-1">{label}</div>
+                    <div class="text-2xl font-mono font-bold">{float(val):.4f}</div>
                 </div>"""
 
         document.querySelector("#resultArea").classList.remove("hidden")
