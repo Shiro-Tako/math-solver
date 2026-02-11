@@ -15,7 +15,7 @@
                 <p class="text-xs uppercase tracking-[0.2em] text-blue-600 font-semibold">CSS114</p>
                 <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Linear Solver</h1>
                 <p class="mt-2 text-sm md:text-base text-slate-600 max-w-xl">
-                    Solve systems of linear equations quickly with Gauss or Gauss-Jordan elimination. Adjust the
+                    Solve systems of linear equations quickly with Gauss, Gauss-Jordan, or LU decomposition. Adjust the
                     matrix size, enter coefficients, and calculate instantly.
                 </p>
             </div>
@@ -59,6 +59,7 @@
                         <select id="method" class="border border-slate-200 p-2 rounded-lg bg-white shadow-sm cursor-pointer focus:border-blue-500 focus:outline-none">
                             <option value="gauss">Gauss Elimination with Pivoting</option>
                             <option value="jordan">Gauss-Jordan Elimination</option>
+                            <option value="lu">LU Decomposition with Pivoting</option>
                         </select>
                     </label>
                 </div>
@@ -103,7 +104,7 @@
     <py-config>
         packages = ["numpy"]
     </py-config>
-    <py-script src="main.py"></py-script>
+    <py-script src="LU.py"></py-script>
 
     <script>
         const rowsInput = document.getElementById("rows");
