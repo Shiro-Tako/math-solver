@@ -217,6 +217,67 @@ def lu_solve(A, b):
     return x, steps
 
 
+def gauss_jordan_inverse_with_steps(A):
+    n = len(A)
+    left = [row[:] for row in A]
+    right = [
+        [Fraction(1) if i == j else Fraction(0) for j in range(n)]
+        for i in range(n)
+    ]
+    steps = [
+        "Initial augmented matrix [A | I]:\n"
+        + "Left (A):\n"
+        + format_matrix(left)
+        + "\n\nRight (I):\n"
+        + format_matrix(right)
+    ]
+
+    for i in range(n):
+        pivot = max(range(i, n), key=lambda r: abs(left[r][i]))
+        if left[pivot][i] == 0:
+            raise ValueError("Matrix is singular.")
+
+        if pivot != i:
+            left[i], left[pivot] = left[pivot], left[i]
+            right[i], right[pivot] = right[pivot], right[i]
+            steps.append(
+                f"Step {len(steps)}: Swap row {i + 1} with row {pivot + 1}.\n"
+                + "Left:\n"
+                + format_matrix(left)
+                + "\n\nRight:\n"
+                + format_matrix(right)
+            )
+
+        pivot_value = left[i][i]
+        left[i] = [value / pivot_value for value in left[i]]
+        right[i] = [value / pivot_value for value in right[i]]
+        steps.append(
+            f"Step {len(steps)}: Normalize row {i + 1} by dividing by {format_fraction(pivot_value)}.\n"
+            + "Left:\n"
+            + format_matrix(left)
+            + "\n\nRight:\n"
+            + format_matrix(right)
+        )
+
+        for r in range(n):
+            if r == i:
+                continue
+            factor = left[r][i]
+            left[r] = [a - factor * p for a, p in zip(left[r], left[i])]
+            right[r] = [a - factor * p for a, p in zip(right[r], right[i])]
+            steps.append(
+                f"Step {len(steps)}: R{r + 1} = R{r + 1} - ({format_fraction(factor)})·R{i + 1}.\n"
+                + "Left:\n"
+                + format_matrix(left)
+                + "\n\nRight:\n"
+                + format_matrix(right)
+            )
+
+    steps.append(
+        f"Step {len(steps)}: Left side becomes identity, so right side is A⁻¹.\n"
+        + format_matrix(right)
+    )
+    return right, steps
 def lu_inverse_with_steps(A):
     n = len(A)
     P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
@@ -291,6 +352,8 @@ def solve_system(event):
             if rows != cols:
                 raise ValueError("Inverse Matrix requires a square matrix.")
 
+            inverse_matrix, steps = gauss_jordan_inverse_with_steps(A_exact)
+            info = "Calculation: Inverse Matrix using Gauss-Jordan Elimination."
             inverse_matrix, steps = lu_inverse_with_steps(A_exact)
             info = "Calculation: Inverse Matrix using LU Decomposition with Partial Pivoting."
             inverse_text = format_matrix(inverse_matrix).replace("\n", " ")
