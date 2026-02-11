@@ -48,11 +48,6 @@ def format_matrix(matrix):
     )
 
 
-# แสดงลำดับสลับแถว (permutation) ให้อยู่ในรูป [2, 0, 1]
-def format_permutation(P):
-    return "[" + ", ".join(str(value) for value in P) + "]"
-
-
 # --- วิธีที่ 1: Gauss Elimination + Partial Pivoting ---
 # คืนคำตอบ x (แบบ Fraction) และบันทึกทุกสเต็ป
 
@@ -148,120 +143,6 @@ def gauss_jordan(A, b):
     return b, steps
 
 
-# --- วิธีที่ 3: LU Decomposition + Partial Pivoting ---
-# คืนค่า P, L, U พร้อมสเต็ปที่ทำทั้งหมด
-
-def lu_decomposition_with_steps(A):
-    n = len(A)
-    U = [row[:] for row in A]  # เริ่ม U จาก A ก่อน แล้วค่อยกำจัดค่า
-    L = [[Fraction(0) for _ in range(n)] for _ in range(n)]
-    P = list(range(n))  # เก็บว่ามีการสลับแถวลำดับไหนบ้าง
-    steps = [
-        "Initial matrices:\n"
-        + "A:\n"
-        + format_matrix(A)
-        + "\n\nL:\n"
-        + format_matrix(L)
-        + "\n\nU:\n"
-        + format_matrix(U)
-        + "\n\nPermutation order: "
-        + format_permutation(P)
-    ]
-
-    for k in range(n):
-        # เลือกแถว pivot สำหรับคอลัมน์ k
-        pivot_row = max(range(k, n), key=lambda r: abs(U[r][k]))
-        if U[pivot_row][k] == 0:
-            raise ValueError("Matrix is singular.")
-
-        # สลับแถวใน U กับ P และปรับ L เฉพาะคอลัมน์ที่ทำไปแล้ว
-        if pivot_row != k:
-            U[k], U[pivot_row] = U[pivot_row], U[k]
-            P[k], P[pivot_row] = P[pivot_row], P[k]
-            for j in range(k):
-                L[k][j], L[pivot_row][j] = L[pivot_row][j], L[k][j]
-            steps.append(
-                f"Step {len(steps)}: Pivot swap row {k + 1} with row {pivot_row + 1}.\n"
-                + "L:\n"
-                + format_matrix(L)
-                + "\n\nU:\n"
-                + format_matrix(U)
-                + "\n\nPermutation order: "
-                + format_permutation(P)
-            )
-
-        # ค่าแนวทแยงของ L ต้องเป็น 1
-        L[k][k] = Fraction(1)
-        steps.append(
-            f"Step {len(steps)}: Set L{k + 1}{k + 1} = 1.\n"
-            + "L:\n"
-            + format_matrix(L)
-        )
-
-        # กำจัดค่าด้านล่าง pivot ของ U แล้วเก็บตัวคูณไว้ใน L
-        for i in range(k + 1, n):
-            factor = U[i][k] / U[k][k]
-            L[i][k] = factor
-            for j in range(k, n):
-                U[i][j] -= factor * U[k][j]
-            steps.append(
-                f"Step {len(steps)}: Eliminate U{i + 1}{k + 1} using factor {format_fraction(factor)}.\n"
-                + "L:\n"
-                + format_matrix(L)
-                + "\n\nU:\n"
-                + format_matrix(U)
-            )
-
-    return P, L, U, steps
-
-
-# เอา P ไปจัดลำดับ b ใหม่ จะได้ Pb
-def apply_permutation(P, b):
-    return [b[index] for index in P]
-
-
-# แก้สมการ Ly = Pb ด้วย forward substitution และบันทึกสเต็ป
-
-def forward_substitution_with_steps(L, b):
-    n = len(L)
-    y = [Fraction(0) for _ in range(n)]
-    steps = ["Solve Ly = Pb using forward substitution."]
-    for i in range(n):
-        total = sum(L[i][j] * y[j] for j in range(i))
-        y[i] = (b[i] - total) / L[i][i]
-        steps.append(f"Step {len(steps)}: y{i + 1} = {format_fraction(y[i])}.")
-    return y, steps
-
-
-# แก้สมการ Ux = y ด้วย backward substitution และบันทึกสเต็ป
-
-def backward_substitution_with_steps(U, y):
-    n = len(U)
-    x = [Fraction(0) for _ in range(n)]
-    steps = ["Solve Ux = y using backward substitution."]
-    for i in range(n - 1, -1, -1):
-        total = sum(U[i][j] * x[j] for j in range(i + 1, n))
-        x[i] = (y[i] - total) / U[i][i]
-        steps.append(f"Step {len(steps)}: x{i + 1} = {format_fraction(x[i])}.")
-    return x, steps
-
-
-# ฟังก์ชันรวมสำหรับวิธี LU: แยกเมทริกซ์ -> จัด b -> เดินหน้า -> ถอยหลัง
-
-def lu_solve(A, b):
-    P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
-    b_permuted = apply_permutation(P, b)
-    permutation_step = (
-        f"Step {len(decomposition_steps)}: Apply permutation to b => Pb = "
-        f"[{', '.join(format_fraction(value) for value in b_permuted)}]."
-    )
-    y, forward_steps = forward_substitution_with_steps(L, b_permuted)
-    x, backward_steps = backward_substitution_with_steps(U, y)
-
-    steps = decomposition_steps + [permutation_step] + forward_steps + backward_steps
-    return x, steps
-
-
 # --- [ส่วนที่ 4: ตัวควบคุมหลัก (Main Controller)] ---
 # อ่านค่าจากหน้าเว็บ เลือกวิธีคำนวณ แล้วโชว์ผลลัพธ์พร้อมขั้นตอน
 
@@ -307,8 +188,10 @@ def solve_system(event):
                 x_exact, steps = gauss_jordan(A_exact, b_exact)
                 info = "Calculation: Gauss-Jordan Elimination."
             else:
-                x_exact, steps = lu_solve(A_exact, b_exact)
-                info = "Calculation: LU Decomposition with Partial Pivoting."
+                raise ValueError(
+                    "Method not supported in main.py. Use gauss or jordan "
+                    "(LU/Inverse is handled in LU.py)."
+                )
 
             # แปลงคำตอบเป็นทศนิยม เพื่อโชว์ในการ์ดผลลัพธ์
             x = [float(value) for value in x_exact]
