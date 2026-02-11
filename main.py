@@ -15,10 +15,25 @@ def is_integer_fraction(value):
     return isinstance(value, Fraction) and value.denominator == 1
 
 
+def format_fraction(value):
+    if is_integer_fraction(value):
+        return str(value.numerator)
+    return f"{value.numerator}/{value.denominator}"
+
+
+def format_system_state(A, b):
+    lines = []
+    for row, constant in zip(A, b):
+        coeffs = ", ".join(format_fraction(value) for value in row)
+        lines.append(f"[{coeffs}] | {format_fraction(constant)}")
+    return "\n".join(lines)
+
+
 def gauss_elimination(A, b):
     n = len(A)
     A = [row[:] for row in A]
     b = b[:]
+    steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
 
     for i in range(n):
         pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
@@ -27,23 +42,35 @@ def gauss_elimination(A, b):
         if pivot != i:
             A[i], A[pivot] = A[pivot], A[i]
             b[i], b[pivot] = b[pivot], b[i]
+            steps.append(
+                f"Step {len(steps)}: Swap row {i + 1} with row {pivot + 1}.\n"
+                + format_system_state(A, b)
+            )
 
         for r in range(i + 1, n):
             factor = A[r][i] / A[i][i]
             A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
             b[r] = b[r] - factor * b[i]
+            steps.append(
+                f"Step {len(steps)}: R{r + 1} = R{r + 1} - ({format_fraction(factor)})·R{i + 1}.\n"
+                + format_system_state(A, b)
+            )
 
     x = [0 for _ in range(n)]
     for i in range(n - 1, -1, -1):
         total = sum(A[i][j] * x[j] for j in range(i + 1, n))
         x[i] = (b[i] - total) / A[i][i]
-    return x
+        steps.append(
+            f"Step {len(steps)}: Back substitution for x{i + 1} = {format_fraction(x[i])}."
+        )
+    return x, steps
 
 
 def gauss_jordan(A, b):
     n = len(A)
     A = [row[:] for row in A]
     b = b[:]
+    steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
 
     for i in range(n):
         pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
@@ -52,10 +79,18 @@ def gauss_jordan(A, b):
         if pivot != i:
             A[i], A[pivot] = A[pivot], A[i]
             b[i], b[pivot] = b[pivot], b[i]
+            steps.append(
+                f"Step {len(steps)}: Swap row {i + 1} with row {pivot + 1}.\n"
+                + format_system_state(A, b)
+            )
 
         pivot_value = A[i][i]
         A[i] = [value / pivot_value for value in A[i]]
         b[i] = b[i] / pivot_value
+        steps.append(
+            f"Step {len(steps)}: Normalize row {i + 1} by dividing by {format_fraction(pivot_value)}.\n"
+            + format_system_state(A, b)
+        )
 
         for r in range(n):
             if r == i:
@@ -63,8 +98,12 @@ def gauss_jordan(A, b):
             factor = A[r][i]
             A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
             b[r] = b[r] - factor * b[i]
+            steps.append(
+                f"Step {len(steps)}: R{r + 1} = R{r + 1} - ({format_fraction(factor)})·R{i + 1}.\n"
+                + format_system_state(A, b)
+            )
 
-    return b
+    return b, steps
 
 def solve_system(event):
     try:
@@ -98,10 +137,10 @@ def solve_system(event):
         # Solving Logic
         if rows == cols:
             if method == "gauss":
-                x_exact = gauss_elimination(A_exact, b_exact)
+                x_exact, steps = gauss_elimination(A_exact, b_exact)
                 info = "Calculation: Gauss Elimination with Partial Pivoting."
             else:
-                x_exact = gauss_jordan(A_exact, b_exact)
+                x_exact, steps = gauss_jordan(A_exact, b_exact)
                 info = "Calculation: Gauss-Jordan Elimination."
 
             x = [float(value) for value in x_exact]
@@ -116,10 +155,15 @@ def solve_system(event):
                     for i, value in enumerate(x_exact)
                 )
             info = f"{info} Exact solution: {exact_text}."
+            process_text = "\n\n".join(steps)
         else:
             # Non-square support via Pseudoinverse
             x = np.linalg.pinv(A) @ b
             info = f"Non-Square Matrix detected ({rows}x{cols}). Applied Pseudoinverse."
+            process_text = (
+                "Initial matrix is non-square, so row-reduction steps are not used.\n"
+                "The solver applied the pseudoinverse method to estimate a least-squares solution."
+            )
 
         # Display results in the solution grid
         grid = document.querySelector("#solutionGrid")
@@ -133,6 +177,8 @@ def solve_system(event):
         
         document.querySelector("#resultArea").classList.remove("hidden")
         document.querySelector("#extraInfo").innerText = info
-        
+        document.querySelector("#processSteps").innerText = process_text
+
     except Exception as e:
         document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
+        document.querySelector("#processSteps").innerText = ""
