@@ -4,6 +4,8 @@ import numpy as np
 from pyscript import document
 
 
+# แปลงค่าที่ผู้ใช้พิมพ์ให้เป็นเศษส่วน (Fraction)
+# เพื่อคำนวณแบบแม่นยำ ไม่โดนปัญหาทศนิยมลอยตัว
 def parse_fraction(value):
     text = (value or "").strip()
     if not text:
@@ -15,6 +17,7 @@ def is_integer_fraction(value):
     return isinstance(value, Fraction) and value.denominator == 1
 
 
+# จัดรูปเศษส่วนให้อ่านง่าย เช่น 6/1 -> 6
 def format_fraction(value):
     if is_integer_fraction(value):
         return str(value.numerator)
@@ -40,6 +43,8 @@ def format_permutation(P):
     return "[" + ", ".join(str(value) for value in P) + "]"
 
 
+# แก้ระบบสมการด้วยวิธี Gauss Elimination
+# แล้วเก็บ "ทุกขั้นตอน" ไว้ให้แสดงผลในหน้าเว็บ
 def gauss_elimination(A, b):
     n = len(A)
     A = [row[:] for row in A]
@@ -47,6 +52,7 @@ def gauss_elimination(A, b):
     steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
 
     for i in range(n):
+        # หา pivot ที่มีค่าสัมบูรณ์มากสุดในคอลัมน์นี้ (partial pivoting)
         pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
         if A[pivot][i] == 0:
             raise ValueError("Matrix is singular.")
@@ -58,6 +64,7 @@ def gauss_elimination(A, b):
                 + format_system_state(A, b)
             )
 
+        # ทำศูนย์ใต้ pivot ทีละแถว
         for r in range(i + 1, n):
             factor = A[r][i] / A[i][i]
             A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
@@ -68,6 +75,7 @@ def gauss_elimination(A, b):
             )
 
     x = [Fraction(0) for _ in range(n)]
+    # แทนค่าถอยหลังจากแถวล่างขึ้นบน เพื่อหา x
     for i in range(n - 1, -1, -1):
         total = sum(A[i][j] * x[j] for j in range(i + 1, n))
         x[i] = (b[i] - total) / A[i][i]
@@ -77,6 +85,7 @@ def gauss_elimination(A, b):
     return x, steps
 
 
+# Gauss-Jordan จะลดเมทริกซ์ให้เป็นรูปที่อ่านคำตอบได้ทันที
 def gauss_jordan(A, b):
     n = len(A)
     A = [row[:] for row in A]
@@ -95,6 +104,7 @@ def gauss_jordan(A, b):
                 + format_system_state(A, b)
             )
 
+        # ทำให้ pivot เป็น 1 ก่อน
         pivot_value = A[i][i]
         A[i] = [value / pivot_value for value in A[i]]
         b[i] = b[i] / pivot_value
@@ -103,6 +113,7 @@ def gauss_jordan(A, b):
             + format_system_state(A, b)
         )
 
+        # แล้วล้างค่าทั้งเหนือ/ใต้ pivot ให้เป็น 0
         for r in range(n):
             if r == i:
                 continue
@@ -117,6 +128,8 @@ def gauss_jordan(A, b):
     return b, steps
 
 
+# แยกเมทริกซ์ A เป็น P, L, U พร้อมบันทึกขั้นตอน
+# P คือการสลับแถว, L คือสามเหลี่ยมล่าง, U คือสามเหลี่ยมบน
 def lu_decomposition_with_steps(A):
     n = len(A)
     U = [row[:] for row in A]
@@ -135,6 +148,7 @@ def lu_decomposition_with_steps(A):
     ]
 
     for k in range(n):
+        # เลือกแถว pivot ที่ดีที่สุดในคอลัมน์ k
         pivot_row = max(range(k, n), key=lambda r: abs(U[r][k]))
         if U[pivot_row][k] == 0:
             raise ValueError("Matrix is singular.")
@@ -154,6 +168,7 @@ def lu_decomposition_with_steps(A):
                 + format_permutation(P)
             )
 
+        # ค่าบนแนวทแยงของ L ต้องเป็น 1 เสมอ
         L[k][k] = Fraction(1)
         steps.append(
             f"Step {len(steps)}: Set L{k + 1}{k + 1} = 1.\n"
@@ -177,6 +192,7 @@ def lu_decomposition_with_steps(A):
     return P, L, U, steps
 
 
+# เรียง b ใหม่ตามลำดับการสลับแถวใน P
 def apply_permutation(P, b):
     return [b[index] for index in P]
 
@@ -203,6 +219,7 @@ def backward_substitution_with_steps(U, y):
     return x, steps
 
 
+# ใช้ LU ที่แยกแล้วเพื่อแก้ระบบสมการ A x = b
 def lu_solve(A, b):
     P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
     b_permuted = apply_permutation(P, b)
@@ -232,6 +249,7 @@ def gauss_jordan_inverse_with_steps(A):
         + format_matrix(right)
     ]
 
+    # ทำ Gauss-Jordan กับ [A | I] จนฝั่งซ้ายเป็น I
     for i in range(n):
         pivot = max(range(i, n), key=lambda r: abs(left[r][i]))
         if left[pivot][i] == 0:
@@ -286,6 +304,7 @@ def lu_inverse_with_steps(A):
         f"Step {len(decomposition_steps)}: Solve A·X = I using the LU factors for each identity column."
     ]
 
+    # หาอินเวอร์สทีละคอลัมน์ โดยแก้ A x = e_col
     for col in range(n):
         e_col = [Fraction(1) if row == col else Fraction(0) for row in range(n)]
         b_permuted = apply_permutation(P, e_col)
@@ -321,6 +340,7 @@ def lu_inverse_with_steps(A):
 
 def solve_system(event):
     try:
+        # อ่านค่าที่ผู้ใช้กรอกจากหน้าเว็บ
         rows = int(document.querySelector("#rows").value)
         cols = int(document.querySelector("#cols").value)
         method = document.querySelector("#method").value
@@ -348,6 +368,7 @@ def solve_system(event):
 
         result_items = []
 
+        # เลือกวิธีคำนวณตามที่ผู้ใช้เลือก
         if method == "inverse":
             if rows != cols:
                 raise ValueError("Inverse Matrix requires a square matrix.")
@@ -402,6 +423,7 @@ def solve_system(event):
             )
             result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
 
+        # แสดงคำตอบเป็นกล่องสวย ๆ บนหน้าเว็บ
         grid = document.querySelector("#solutionGrid")
         grid.innerHTML = ""
         for label, val in result_items:
@@ -416,5 +438,6 @@ def solve_system(event):
         document.querySelector("#processSteps").innerText = process_text
 
     except Exception as e:
+        # ถ้ามีข้อผิดพลาด ให้โชว์ข้อความที่อ่านง่ายในหน้าเว็บ
         document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
         document.querySelector("#processSteps").innerText = ""
