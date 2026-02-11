@@ -4,8 +4,8 @@ import numpy as np
 from pyscript import document
 
 
-# แปลงค่าที่ผู้ใช้กรอกให้เป็น Fraction เพื่อคำนวณแบบ exact
-# รองรับค่าว่าง โดยตีความเป็น 0
+# ฟังก์ชันนี้เอาค่าจากช่องกรอกมาแปลงเป็นเศษส่วน
+# ถ้าผู้ใช้เว้นว่างไว้ ให้ถือว่าเป็น 0 ไปเลย
 
 def parse_fraction(value):
     text = (value or "").strip()
@@ -14,14 +14,14 @@ def parse_fraction(value):
     return Fraction(text)
 
 
-# เช็กว่า Fraction นี้เป็นจำนวนเต็มหรือไม่ (ส่วนเป็น 1)
+# เช็กว่าเศษส่วนนี้จริง ๆ แล้วเป็นจำนวนเต็มไหม (ส่วนต้องเป็น 1)
 def is_integer_fraction(value):
     return isinstance(value, Fraction) and value.denominator == 1
 
 
-# จัดรูป Fraction สำหรับแสดงผล
-# ถ้าเป็นจำนวนเต็มจะแสดงแค่ตัวเศษ เช่น 3
-# ถ้าไม่ใช่จะแสดงแบบ a/b เช่น 7/5
+# จัดรูปเศษส่วนให้อ่านง่ายตอนแสดงผล
+# ถ้าเป็นจำนวนเต็มก็โชว์แค่เลขเดียว เช่น 3
+# ถ้ายังเป็นเศษส่วนก็โชว์แบบ a/b เช่น 7/5
 
 def format_fraction(value):
     if is_integer_fraction(value):
@@ -29,7 +29,7 @@ def format_fraction(value):
     return f"{value.numerator}/{value.denominator}"
 
 
-# จัดรูปสถานะระบบสมการ [A|b] เป็นหลายบรรทัดสำหรับบันทึกขั้นตอน
+# เอาสถานะสมการ [A|b] มาเรียงเป็นหลายบรรทัดไว้ดูขั้นตอน
 
 def format_system_state(A, b):
     lines = []
@@ -39,7 +39,7 @@ def format_system_state(A, b):
     return "\n".join(lines)
 
 
-# จัดรูปเมทริกซ์ให้เป็นข้อความหลายบรรทัด
+# แปลงเมทริกซ์ให้กลายเป็นข้อความหลายบรรทัด
 
 def format_matrix(matrix):
     return "\n".join(
@@ -48,28 +48,28 @@ def format_matrix(matrix):
     )
 
 
-# จัดรูป permutation vector เช่น [2, 0, 1]
+# แสดงลำดับสลับแถว (permutation) ให้อยู่ในรูป [2, 0, 1]
 def format_permutation(P):
     return "[" + ", ".join(str(value) for value in P) + "]"
 
 
 # --- วิธีที่ 1: Gauss Elimination + Partial Pivoting ---
-# คืนค่า (คำตอบ x แบบ Fraction, รายการ steps)
+# คืนคำตอบ x (แบบ Fraction) และบันทึกทุกสเต็ป
 
 def gauss_elimination(A, b):
     n = len(A)
-    A = [row[:] for row in A]  # สำเนาเพื่อไม่แก้ข้อมูลต้นฉบับ
+    A = [row[:] for row in A]  # ก๊อปปี้ไว้ก่อน จะได้ไม่ไปทับข้อมูลเดิม
     b = b[:]
     steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
 
-    # เดินทีละคอลัมน์เพื่อทำ elimination ใต้ pivot
+    # วนทีละคอลัมน์ แล้วทำให้ค่าด้านล่าง pivot เป็น 0
     for i in range(n):
-        # หาแถว pivot ที่ค่าสัมบูรณ์มากที่สุดในคอลัมน์ i
+        # หาแถวที่เหมาะเป็น pivot ที่สุด (ค่าสัมบูรณ์มากสุดในคอลัมน์นี้)
         pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
         if A[pivot][i] == 0:
             raise ValueError("Matrix is singular.")
 
-        # สลับแถวเพื่อย้าย pivot ขึ้นมา
+        # ถ้า pivot ยังไม่อยู่แถวบนสุดของรอบนี้ ก็สลับแถวก่อน
         if pivot != i:
             A[i], A[pivot] = A[pivot], A[i]
             b[i], b[pivot] = b[pivot], b[i]
@@ -78,7 +78,7 @@ def gauss_elimination(A, b):
                 + format_system_state(A, b)
             )
 
-        # กำจัดสมาชิกใต้ pivot ให้เป็น 0
+        # จัดการค่าที่อยู่ใต้ pivot ให้กลายเป็น 0
         for r in range(i + 1, n):
             factor = A[r][i] / A[i][i]
             A[r] = [a - factor * p for a, p in zip(A[r], A[i])]
@@ -88,7 +88,7 @@ def gauss_elimination(A, b):
                 + format_system_state(A, b)
             )
 
-    # Back substitution หา x จากแถวล่างขึ้นบน
+    # หาค่า x ย้อนจากแถวล่างขึ้นบน (back substitution)
     x = [Fraction(0) for _ in range(n)]
     for i in range(n - 1, -1, -1):
         total = sum(A[i][j] * x[j] for j in range(i + 1, n))
@@ -100,21 +100,21 @@ def gauss_elimination(A, b):
 
 
 # --- วิธีที่ 2: Gauss-Jordan Elimination + Partial Pivoting ---
-# คืนค่า (คำตอบ x แบบ Fraction, รายการ steps)
+# คืนคำตอบ x (แบบ Fraction) และบันทึกทุกสเต็ป
 
 def gauss_jordan(A, b):
     n = len(A)
-    A = [row[:] for row in A]  # สำเนาเพื่อไม่แก้ข้อมูลต้นฉบับ
+    A = [row[:] for row in A]  # ก๊อปปี้ไว้ก่อน จะได้ไม่ไปแก้ของเดิม
     b = b[:]
     steps = ["Initial augmented matrix:\n" + format_system_state(A, b)]
 
     for i in range(n):
-        # เลือก pivot ที่ดีที่สุดในคอลัมน์ i
+        # เลือก pivot ที่ดีที่สุดในคอลัมน์นี้
         pivot = max(range(i, n), key=lambda r: abs(A[r][i]))
         if A[pivot][i] == 0:
             raise ValueError("Matrix is singular.")
 
-        # สลับแถวถ้าจำเป็น
+        # ถ้าจำเป็นก็สลับแถว
         if pivot != i:
             A[i], A[pivot] = A[pivot], A[i]
             b[i], b[pivot] = b[pivot], b[i]
@@ -123,7 +123,7 @@ def gauss_jordan(A, b):
                 + format_system_state(A, b)
             )
 
-        # Normalize แถว pivot ให้ค่าสมาชิก pivot = 1
+        # ทำให้ pivot ตำแหน่งนี้กลายเป็น 1
         pivot_value = A[i][i]
         A[i] = [value / pivot_value for value in A[i]]
         b[i] = b[i] / pivot_value
@@ -132,7 +132,7 @@ def gauss_jordan(A, b):
             + format_system_state(A, b)
         )
 
-        # กำจัดสมาชิกคอลัมน์ pivot ในทุกแถวอื่นให้เป็น 0
+        # ทำให้ค่าในคอลัมน์ pivot ของแถวอื่นเป็น 0
         for r in range(n):
             if r == i:
                 continue
@@ -144,18 +144,18 @@ def gauss_jordan(A, b):
                 + format_system_state(A, b)
             )
 
-    # เมื่อเป็น reduced row-echelon แล้ว b คือคำตอบทันที
+    # พอได้ reduced row-echelon แล้ว คำตอบอยู่ใน b เลย
     return b, steps
 
 
 # --- วิธีที่ 3: LU Decomposition + Partial Pivoting ---
-# คืนค่า (P, L, U, steps)
+# คืนค่า P, L, U พร้อมสเต็ปที่ทำทั้งหมด
 
 def lu_decomposition_with_steps(A):
     n = len(A)
-    U = [row[:] for row in A]  # U เริ่มจาก A แล้วค่อย elimination
+    U = [row[:] for row in A]  # เริ่ม U จาก A ก่อน แล้วค่อยกำจัดค่า
     L = [[Fraction(0) for _ in range(n)] for _ in range(n)]
-    P = list(range(n))  # เก็บลำดับการสลับแถว
+    P = list(range(n))  # เก็บว่ามีการสลับแถวลำดับไหนบ้าง
     steps = [
         "Initial matrices:\n"
         + "A:\n"
@@ -169,12 +169,12 @@ def lu_decomposition_with_steps(A):
     ]
 
     for k in range(n):
-        # เลือกแถว pivot ของคอลัมน์ k
+        # เลือกแถว pivot สำหรับคอลัมน์ k
         pivot_row = max(range(k, n), key=lambda r: abs(U[r][k]))
         if U[pivot_row][k] == 0:
             raise ValueError("Matrix is singular.")
 
-        # สลับแถวใน U และ P พร้อมปรับ L เฉพาะคอลัมน์ก่อนหน้า
+        # สลับแถวใน U กับ P และปรับ L เฉพาะคอลัมน์ที่ทำไปแล้ว
         if pivot_row != k:
             U[k], U[pivot_row] = U[pivot_row], U[k]
             P[k], P[pivot_row] = P[pivot_row], P[k]
@@ -190,7 +190,7 @@ def lu_decomposition_with_steps(A):
                 + format_permutation(P)
             )
 
-        # แนวทแยงของ L เป็น 1
+        # ค่าแนวทแยงของ L ต้องเป็น 1
         L[k][k] = Fraction(1)
         steps.append(
             f"Step {len(steps)}: Set L{k + 1}{k + 1} = 1.\n"
@@ -198,7 +198,7 @@ def lu_decomposition_with_steps(A):
             + format_matrix(L)
         )
 
-        # Eliminate ใต้ pivot ของ U และเก็บ factor ลง L
+        # กำจัดค่าด้านล่าง pivot ของ U แล้วเก็บตัวคูณไว้ใน L
         for i in range(k + 1, n):
             factor = U[i][k] / U[k][k]
             L[i][k] = factor
@@ -215,12 +215,12 @@ def lu_decomposition_with_steps(A):
     return P, L, U, steps
 
 
-# นำ permutation P ไปเรียง b ใหม่ให้ได้ Pb
+# เอา P ไปจัดลำดับ b ใหม่ จะได้ Pb
 def apply_permutation(P, b):
     return [b[index] for index in P]
 
 
-# แก้ Ly = b ด้วย forward substitution พร้อมเก็บ steps
+# แก้สมการ Ly = Pb ด้วย forward substitution และบันทึกสเต็ป
 
 def forward_substitution_with_steps(L, b):
     n = len(L)
@@ -233,7 +233,7 @@ def forward_substitution_with_steps(L, b):
     return y, steps
 
 
-# แก้ Ux = y ด้วย backward substitution พร้อมเก็บ steps
+# แก้สมการ Ux = y ด้วย backward substitution และบันทึกสเต็ป
 
 def backward_substitution_with_steps(U, y):
     n = len(U)
@@ -246,7 +246,7 @@ def backward_substitution_with_steps(U, y):
     return x, steps
 
 
-# wrapper สำหรับแก้ระบบด้วย LU ครบทุกขั้น: Decompose -> Permute b -> Forward -> Backward
+# ฟังก์ชันรวมสำหรับวิธี LU: แยกเมทริกซ์ -> จัด b -> เดินหน้า -> ถอยหลัง
 
 def lu_solve(A, b):
     P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
@@ -263,24 +263,24 @@ def lu_solve(A, b):
 
 
 # --- [ส่วนที่ 4: ตัวควบคุมหลัก (Main Controller)] ---
-# อ่านค่าจากหน้าเว็บ, เลือกวิธีคำนวณ, แล้วแสดงผลลัพธ์และขั้นตอน
+# อ่านค่าจากหน้าเว็บ เลือกวิธีคำนวณ แล้วโชว์ผลลัพธ์พร้อมขั้นตอน
 
 def solve_system(event):
     try:
-        # อ่านค่าจาก UI
+        # ดึงค่าที่ผู้ใช้กรอกมาจากหน้าเว็บ
         rows = int(document.querySelector("#rows").value)
         cols = int(document.querySelector("#cols").value)
         method = document.querySelector("#method").value
 
-        # เก็บข้อมูล 2 แบบ:
-        # - exact (Fraction) ใช้กับวิธีเชิงสัญลักษณ์
-        # - float (NumPy) ใช้กับ pseudoinverse กรณีเมทริกซ์ไม่จัตุรัส
+        # เตรียมข้อมูล 2 แบบไว้ใช้
+        # - แบบ Fraction สำหรับคำนวณให้ตรงเป๊ะ
+        # - แบบ float สำหรับใช้กับ pseudoinverse ตอนเมทริกซ์ไม่จัตุรัส
         A_list = []
         b_list = []
         A_exact = []
         b_exact = []
 
-        # อ่านค่าเมทริกซ์ A และเวกเตอร์ b จากช่องอินพุต
+        # วนอ่านค่า A และ b จากช่องกรอกทั้งหมด
         for i in range(rows):
             row_data = []
             row_exact = []
@@ -294,11 +294,11 @@ def solve_system(event):
             b_exact.append(parse_fraction(b_value))
             b_list.append(float(b_value or 0))
 
-        # เตรียมข้อมูลรูปแบบ NumPy สำหรับกรณี pseudoinverse
+        # แปลงเป็น NumPy array เผื่อใช้วิธี pseudoinverse
         A = np.array(A_list)
         b = np.array(b_list)
 
-        # กรณีเมทริกซ์จัตุรัส: ใช้วิธีตรงตามที่ผู้ใช้เลือก
+        # ถ้าเป็นเมทริกซ์จัตุรัส ใช้วิธีที่ผู้ใช้เลือกได้เลย
         if rows == cols:
             if method == "gauss":
                 x_exact, steps = gauss_elimination(A_exact, b_exact)
@@ -310,10 +310,10 @@ def solve_system(event):
                 x_exact, steps = lu_solve(A_exact, b_exact)
                 info = "Calculation: LU Decomposition with Partial Pivoting."
 
-            # แปลงคำตอบไปเป็น float เพื่อแสดงผลเป็นทศนิยมบนการ์ด
+            # แปลงคำตอบเป็นทศนิยม เพื่อโชว์ในการ์ดผลลัพธ์
             x = [float(value) for value in x_exact]
 
-            # สร้างข้อความ exact solution (จำนวนเต็ม/เศษส่วน)
+            # สร้างข้อความคำตอบแบบ exact (จำนวนเต็ม/เศษส่วน)
             if all(is_integer_fraction(value) for value in x_exact):
                 exact_text = ", ".join(
                     f"x{i + 1} = {value.numerator}" for i, value in enumerate(x_exact)
@@ -327,7 +327,7 @@ def solve_system(event):
             info = f"{info} Exact solution: {exact_text}."
             process_text = "\n\n".join(steps)
 
-        # กรณีเมทริกซ์ไม่จัตุรัส: ใช้ pseudoinverse หา least-squares
+        # ถ้าไม่ใช่เมทริกซ์จัตุรัส ให้ใช้ pseudoinverse หา least-squares
         else:
             x = np.linalg.pinv(A) @ b
             info = f"Non-Square Matrix detected ({rows}x{cols}). Applied Pseudoinverse."
@@ -336,7 +336,7 @@ def solve_system(event):
                 "The solver applied the pseudoinverse method to estimate a least-squares solution."
             )
 
-        # แสดงผลลัพธ์ใน grid
+        # เอาคำตอบไปแสดงในกริดบนหน้าเว็บ
         grid = document.querySelector("#solutionGrid")
         grid.innerHTML = ""
         for i, val in enumerate(x):
@@ -346,12 +346,12 @@ def solve_system(event):
                     <div class="text-2xl font-mono font-bold">{float(val):.4f}</div>
                 </div>"""
 
-        # แสดงข้อมูลสรุปและขั้นตอน
+        # แสดงข้อความสรุปกับขั้นตอนการคำนวณ
         document.querySelector("#resultArea").classList.remove("hidden")
         document.querySelector("#extraInfo").innerText = info
         document.querySelector("#processSteps").innerText = process_text
 
     except Exception as e:
-        # หากมีข้อผิดพลาด ให้แสดง error ที่หน้าเว็บ
+        # ถ้าเจอ error ก็แจ้งบนหน้าเว็บเลย
         document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
         document.querySelector("#processSteps").innerText = ""
