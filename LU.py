@@ -285,7 +285,23 @@ def solve_system(event):
         A = np.array(A_list)
         b = np.array(b_list)
 
-        if rows == cols:
+        result_items = []
+
+        if method == "inverse":
+            if rows != cols:
+                raise ValueError("Inverse Matrix requires a square matrix.")
+
+            inverse_matrix, steps = lu_inverse_with_steps(A_exact)
+            info = "Calculation: Inverse Matrix using LU Decomposition with Partial Pivoting."
+            inverse_text = format_matrix(inverse_matrix).replace("\n", " ")
+            info = f"{info} Inverse matrix A⁻¹: {inverse_text}."
+            process_text = "\n\n".join(steps)
+
+            for i in range(rows):
+                for j in range(cols):
+                    value = float(inverse_matrix[i][j])
+                    result_items.append((f"A⁻¹({i + 1},{j + 1})", value))
+        elif rows == cols:
             if method == "gauss":
                 x_exact, steps = gauss_elimination(A_exact, b_exact)
                 info = "Calculation: Gauss Elimination with Partial Pivoting."
@@ -313,6 +329,7 @@ def solve_system(event):
                 info = f"{info} Inverse matrix A⁻¹: {inverse_text}."
                 steps.extend(["", "Inverse matrix calculation:"] + inverse_steps)
             process_text = "\n\n".join(steps)
+            result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
         else:
             x = np.linalg.pinv(A) @ b
             info = f"Non-Square Matrix detected ({rows}x{cols}). Applied Pseudoinverse."
@@ -320,14 +337,15 @@ def solve_system(event):
                 "Initial matrix is non-square, so row-reduction steps are not used.\n"
                 "The solver applied the pseudoinverse method to estimate a least-squares solution."
             )
+            result_items = [(f"Variable X{i + 1}", float(val)) for i, val in enumerate(x)]
 
         grid = document.querySelector("#solutionGrid")
         grid.innerHTML = ""
-        for i, val in enumerate(x):
+        for label, val in result_items:
             grid.innerHTML += f"""
-                <div class=\"bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center\">
-                    <div class=\"text-blue-500 font-bold text-[10px] uppercase mb-1\">Variable X{i+1}</div>
-                    <div class=\"text-2xl font-mono font-bold\">{float(val):.4f}</div>
+                <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm text-center">
+                    <div class="text-blue-500 font-bold text-[10px] uppercase mb-1">{label}</div>
+                    <div class="text-2xl font-mono font-bold">{float(val):.4f}</div>
                 </div>"""
 
         document.querySelector("#resultArea").classList.remove("hidden")
