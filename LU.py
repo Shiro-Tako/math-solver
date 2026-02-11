@@ -217,6 +217,47 @@ def lu_solve(A, b):
     return x, steps
 
 
+def lu_inverse_with_steps(A):
+    n = len(A)
+    P, L, U, decomposition_steps = lu_decomposition_with_steps(A)
+    inverse_columns = []
+    steps = decomposition_steps + [
+        f"Step {len(decomposition_steps)}: Solve A·X = I using the LU factors for each identity column."
+    ]
+
+    for col in range(n):
+        e_col = [Fraction(1) if row == col else Fraction(0) for row in range(n)]
+        b_permuted = apply_permutation(P, e_col)
+
+        steps.append(
+            f"Step {len(steps)}: Column {col + 1} -> apply permutation to e{col + 1}, "
+            + f"Pb = [{', '.join(format_fraction(value) for value in b_permuted)}]."
+        )
+
+        y, forward_steps = forward_substitution_with_steps(L, b_permuted)
+        x_col, backward_steps = backward_substitution_with_steps(U, y)
+        inverse_columns.append(x_col)
+
+        steps.extend(
+            f"Step {len(steps)}: Column {col + 1} forward solve - {text}"
+            for text in forward_steps
+        )
+        steps.extend(
+            f"Step {len(steps)}: Column {col + 1} backward solve - {text}"
+            for text in backward_steps
+        )
+
+    inverse_matrix = [
+        [inverse_columns[col][row] for col in range(n)]
+        for row in range(n)
+    ]
+    steps.append(
+        f"Step {len(steps)}: Assemble inverse matrix from solved columns.\n"
+        + format_matrix(inverse_matrix)
+    )
+    return inverse_matrix, steps
+
+
 def solve_system(event):
     try:
         rows = int(document.querySelector("#rows").value)
@@ -253,6 +294,7 @@ def solve_system(event):
                 info = "Calculation: Gauss-Jordan Elimination."
             else:
                 x_exact, steps = lu_solve(A_exact, b_exact)
+                inverse_matrix, inverse_steps = lu_inverse_with_steps(A_exact)
                 info = "Calculation: LU Decomposition with Partial Pivoting."
 
             x = [float(value) for value in x_exact]
@@ -266,6 +308,10 @@ def solve_system(event):
                     for i, value in enumerate(x_exact)
                 )
             info = f"{info} Exact solution: {exact_text}."
+            if method == "lu":
+                inverse_text = format_matrix(inverse_matrix).replace("\n", " ")
+                info = f"{info} Inverse matrix A⁻¹: {inverse_text}."
+                steps.extend(["", "Inverse matrix calculation:"] + inverse_steps)
             process_text = "\n\n".join(steps)
         else:
             x = np.linalg.pinv(A) @ b
