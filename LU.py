@@ -129,8 +129,9 @@ def gauss_jordan(A, b):
 
 
 # แยกเมทริกซ์ A เป็น P, L, U พร้อมบันทึกขั้นตอน
-# P คือการสลับแถว, L คือสามเหลี่ยมล่าง, U คือสามเหลี่ยมบน
 def lu_decomposition_with_steps(A):
+    # define matrix U(copy from A), L(Iden matrix) and P for Permutation (เก้บค่าการสลับแถวไว้เปลี่ยน b)
+    # make all elements in L = 0 เพื่อกัน error (ทำให้เป็น matrix I ทีหลัง โดยค่อยๆเปลี่ยนเส้นทแยงมุมเป็น 1 ในรอบแถวนั้นๆ)
     n = len(A)
     U = [row[:] for row in A]
     L = [[Fraction(0) for _ in range(n)] for _ in range(n)]
@@ -149,10 +150,11 @@ def lu_decomposition_with_steps(A):
 
     for k in range(n):
         # เลือกแถว pivot ที่ดีที่สุดในคอลัมน์ k
-        pivot_row = max(range(k, n), key=lambda r: abs(U[r][k]))
+        pivot_row = max(range(k, n), key=lambda r: abs(U[r][k])) #return row that have max value from that row.
         if U[pivot_row][k] == 0:
             raise ValueError("Matrix is singular.")
 
+        #สลับให้แถวที่มีค่ามากสุดอยุ่บน
         if pivot_row != k:
             U[k], U[pivot_row] = U[pivot_row], U[k]
             P[k], P[pivot_row] = P[pivot_row], P[k]
@@ -168,7 +170,7 @@ def lu_decomposition_with_steps(A):
                 + format_permutation(P)
             )
 
-        # ค่าบนแนวทแยงของ L ต้องเป็น 1 เสมอ
+        # เปลี่ยนค่าบนแนวทแยงของ L เป็น 1 ในรอบแถวนั้นๆ
         L[k][k] = Fraction(1)
         steps.append(
             f"Step {len(steps)}: Set L{k + 1}{k + 1} = 1.\n"
@@ -177,10 +179,10 @@ def lu_decomposition_with_steps(A):
         )
 
         for i in range(k + 1, n):
-            factor = U[i][k] / U[k][k]
-            L[i][k] = factor
+            factor = U[i][k] / U[k][k] # หาตัวคูณ
+            L[i][k] = factor   #เก็บค่าลง matrix L
             for j in range(k, n):
-                U[i][j] -= factor * U[k][j]
+                U[i][j] -= factor * U[k][j] #กำจัดค่าให้เป็น 0
             steps.append(
                 f"Step {len(steps)}: Eliminate U{i + 1}{k + 1} using factor {format_fraction(factor)}.\n"
                 + "L:\n"
@@ -202,8 +204,8 @@ def forward_substitution_with_steps(L, b):
     y = [Fraction(0) for _ in range(n)]
     steps = ["Solve Ly = Pb using forward substitution."]
     for i in range(n):
-        total = sum(L[i][j] * y[j] for j in range(i))
-        y[i] = (b[i] - total) / L[i][i]
+        total = sum(L[i][j] * y[j] for j in range(i)) #คูณ matrix หาผลรวมก่อนหน้าเพื่อใช้ในการแทนค่าตัวแปรต่อไป
+        y[i] = (b[i] - total) / L[i][i] #ย้ายข้างหาค่า
         steps.append(f"Step {len(steps)}: y{i + 1} = {format_fraction(y[i])}.")
     return y, steps
 
@@ -213,8 +215,8 @@ def backward_substitution_with_steps(U, y):
     x = [Fraction(0) for _ in range(n)]
     steps = ["Solve Ux = y using backward substitution."]
     for i in range(n - 1, -1, -1):
-        total = sum(U[i][j] * x[j] for j in range(i + 1, n))
-        x[i] = (y[i] - total) / U[i][i]
+        total = sum(U[i][j] * x[j] for j in range(i + 1, n)) #คูณ matrix หาผลรวมก่อนหน้าเพื่อใช้ในการแทนค่าตัวแปรต่อไป
+        x[i] = (y[i] - total) / U[i][i] #ย้ายข้างหาค่า
         steps.append(f"Step {len(steps)}: x{i + 1} = {format_fraction(x[i])}.")
     return x, steps
 
