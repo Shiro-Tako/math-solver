@@ -340,6 +340,19 @@ def lu_inverse_with_steps(A):
     return inverse_matrix, steps
 
 
+def set_info_message(message, is_error=False):
+    info_box = document.querySelector("#extraInfo")
+    info_box.innerText = message
+    if is_error:
+        info_box.className = (
+            "mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
+        )
+    else:
+        info_box.className = (
+            "mt-4 rounded-xl bg-slate-100 p-3 text-sm text-slate-600"
+        )
+
+
 def solve_system(event):
     try:
         # อ่านค่าที่ผู้ใช้กรอกจากหน้าเว็บ
@@ -436,10 +449,18 @@ def solve_system(event):
                 </div>"""
 
         document.querySelector("#resultArea").classList.remove("hidden")
-        document.querySelector("#extraInfo").innerText = info
+        set_info_message(info)
         document.querySelector("#processSteps").innerText = process_text
 
     except Exception as e:
         # ถ้ามีข้อผิดพลาด ให้โชว์ข้อความที่อ่านง่ายในหน้าเว็บ
-        document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
+        message = str(e)
+        if "singular" in message.lower():
+            message = (
+                "Matrix is singular. Infinite or no unique solution exists, "
+                "so this method cannot proceed."
+            )
+        else:
+            message = f"Error: {message}"
+        set_info_message(message, is_error=True)
         document.querySelector("#processSteps").innerText = ""
