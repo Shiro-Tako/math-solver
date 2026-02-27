@@ -340,6 +340,52 @@ def lu_inverse_with_steps(A):
     return inverse_matrix, steps
 
 
+def matrix_rank_fraction(matrix):
+    working = [row[:] for row in matrix]
+    row_count = len(working)
+    col_count = len(working[0]) if row_count else 0
+    rank = 0
+
+    for col in range(col_count):
+        pivot = None
+        for r in range(rank, row_count):
+            if working[r][col] != 0:
+                pivot = r
+                break
+
+        if pivot is None:
+            continue
+
+        if pivot != rank:
+            working[rank], working[pivot] = working[pivot], working[rank]
+
+        for r in range(rank + 1, row_count):
+            if working[r][col] == 0:
+                continue
+            factor = working[r][col] / working[rank][col]
+            for c in range(col, col_count):
+                working[r][c] -= factor * working[rank][c]
+
+        rank += 1
+        if rank == row_count:
+            break
+
+    return rank
+
+
+def classify_singular_system(A, b):
+    augmented = [row[:] + [constant] for row, constant in zip(A, b)]
+    rank_a = matrix_rank_fraction(A)
+    rank_augmented = matrix_rank_fraction(augmented)
+    variable_count = len(A[0]) if A else 0
+
+    if rank_augmented > rank_a:
+        return "no_solution"
+    if rank_a < variable_count:
+        return "infinite"
+    return "singular"
+
+
 def set_info_message(message, is_error=False):
     info_box = document.querySelector("#extraInfo")
     info_box.innerText = message
@@ -456,11 +502,23 @@ def solve_system(event):
         # ถ้ามีข้อผิดพลาด ให้โชว์ข้อความที่อ่านง่ายในหน้าเว็บ
         message = str(e)
         if "singular" in message.lower():
-            message = (
-                "Matrix is singular. Infinite or no unique solution exists, "
-                "so this method cannot proceed."
-            )
+            if method == "inverse":
+                message = "Matrix is singular, so the inverse matrix does not exist."
+            else:
+                case_type = classify_singular_system(A_exact, b_exact)
+                if case_type == "no_solution":
+                    message = (
+                        "No solution case: the system is inconsistent "
+                        "(rank(A) < rank([A|b]))."
+                    )
+                else:
+                    message = (
+                        "Infinite solutions case: the system is dependent "
+                        "(rank(A) = rank([A|b]) < number of variables)."
+                    )
         else:
             message = f"Error: {message}"
+        document.querySelector("#resultArea").classList.remove("hidden")
+        document.querySelector("#solutionGrid").innerHTML = ""
         set_info_message(message, is_error=True)
         document.querySelector("#processSteps").innerText = ""
