@@ -340,6 +340,65 @@ def lu_inverse_with_steps(A):
     return inverse_matrix, steps
 
 
+def matrix_rank_fraction(matrix):
+    working = [row[:] for row in matrix]
+    row_count = len(working)
+    col_count = len(working[0]) if row_count else 0
+    rank = 0
+
+    for col in range(col_count):
+        pivot = None
+        for r in range(rank, row_count):
+            if working[r][col] != 0:
+                pivot = r
+                break
+
+        if pivot is None:
+            continue
+
+        if pivot != rank:
+            working[rank], working[pivot] = working[pivot], working[rank]
+
+        for r in range(rank + 1, row_count):
+            if working[r][col] == 0:
+                continue
+            factor = working[r][col] / working[rank][col]
+            for c in range(col, col_count):
+                working[r][c] -= factor * working[rank][c]
+
+        rank += 1
+        if rank == row_count:
+            break
+
+    return rank
+
+
+def classify_singular_system(A, b):
+    augmented = [row[:] + [constant] for row, constant in zip(A, b)]
+    rank_a = matrix_rank_fraction(A)
+    rank_augmented = matrix_rank_fraction(augmented)
+    variable_count = len(A[0]) if A else 0
+
+    if rank_augmented > rank_a:
+        return "no_solution"
+    if rank_a < variable_count:
+        return "infinite"
+    return "singular"
+
+
+def set_info_message(message, is_error=False):
+    info_box = document.querySelector("#extraInfo")
+    info_box.innerText = message
+    if is_error:
+        info_box.className = (
+            "mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700"
+        )
+    else:
+        info_box.className = (
+            "mt-4 rounded-xl bg-slate-100 p-3 text-sm text-slate-600"
+        )
+
+
 def solve_system(event):
     try:
         # อ่านค่าที่ผู้ใช้กรอกจากหน้าเว็บ
@@ -436,10 +495,30 @@ def solve_system(event):
                 </div>"""
 
         document.querySelector("#resultArea").classList.remove("hidden")
-        document.querySelector("#extraInfo").innerText = info
+        set_info_message(info)
         document.querySelector("#processSteps").innerText = process_text
 
     except Exception as e:
         # ถ้ามีข้อผิดพลาด ให้โชว์ข้อความที่อ่านง่ายในหน้าเว็บ
-        document.querySelector("#extraInfo").innerText = f"Error: {str(e)}"
+        message = str(e)
+        if "singular" in message.lower():
+            if method == "inverse":
+                message = "Matrix is singular, so the inverse matrix does not exist."
+            else:
+                case_type = classify_singular_system(A_exact, b_exact)
+                if case_type == "no_solution":
+                    message = (
+                        "No solution case: the system is inconsistent "
+                        "(rank(A) < rank([A|b]))."
+                    )
+                else:
+                    message = (
+                        "Infinite solutions case: the system is dependent "
+                        "(rank(A) = rank([A|b]) < number of variables)."
+                    )
+        else:
+            message = f"Error: {message}"
+        document.querySelector("#resultArea").classList.remove("hidden")
+        document.querySelector("#solutionGrid").innerHTML = ""
+        set_info_message(message, is_error=True)
         document.querySelector("#processSteps").innerText = ""
